@@ -15,11 +15,11 @@ uniform mat4 orthographicMatrix;
 uniform mediump float sphereRadius;
 
 void main() {
-	Vec4 tp;
+	vec4 tp;
 	tp = modelViewProjMatrix * pos;
 	impostorCoord = inputImpostorCoord.xy;
 	tp.xy = tp.xy + inputImpostorCoord.xy * vec2(sphereRadius);
 	tp = tp * orthographicMatrix;
 	normalizedViewCoord = (tp.xyz + 1.0) / 2.0;
-	gl_position = tp;
-};
+	gl_Position = tp;
+}
