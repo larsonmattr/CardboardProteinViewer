@@ -67,8 +67,23 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
 
     // Uniforms used by both Vertex & Fragment shader
     private float[] modelViewProjMatrix = new float[16];
-    private float[] orthographicMatrix = new float[16];
     private float sphereRadius;
+
+    // Values to which we are mapping viewport
+    private final float left = -1.0f;
+    private final float right = 1.0f;
+    private final float top = 1.0f;
+    private final float bottom = -1.0f;
+    private final float near = -1.0f; // value to map the near plane
+    private final float far = 1.0f; // value to map the far plane
+    private final float orthographicMatrix[] =
+            {
+                    -1.0f/right,0.0f,0.0f,-(right+left)/(right-left),
+                    0.0f,1.0f/top,0.0f,-(top+bottom)/(top-bottom),
+                    0.0f,0.0f,-2.0f/(far-near),-(far+near)/(far-near),
+                    0.0f,0.0f,0.0f,1.0f
+            };  // The matrix simplifies further, but nice to have it all laid out, and valid if viewport not symmetrical.
+
 
     // Uniforms used by Fragment shader only
     private float[] lightPosition; // vec3
@@ -168,7 +183,8 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
     public void drawProtein() {
 
         // How many floats describe a position (Vec3 = 3).
-        int POSITION_DATA_SIZE = 3;
+        int POSITION_DATA_SIZE = 3; // vec3
+        int BILLBOARD_DATA_SIZE = 2; // vec2
 
         // Draw should look something like this.
         // glBindBuffer, then glEnableVertexAttribArray, then glVertexAttribPointer..
@@ -181,15 +197,22 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
         // Check be the last of a set of handles
         OpenGLHelper.checkGLError(TAG, "mPositionHandle");
 
-        // TODO: set the billboard handles
+        // set the billboard handles
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, buffers[1]);
+        GLES20.glEnableVertexAttribArray(inputImposterCoordHandle);
+        GLES20.glVertexAttribPointer(inputImposterCoordHandle, BILLBOARD_DATA_SIZE, GLES20.GL_FLOAT, false, 0, 0);
 
-        // TODO: set ALL the uniform handles
+        // Set ALL the uniform handles
         // Set the MVP matrix.
         GLES20.glUniformMatrix4fv(modelViewProjMatrixHandle, 1, false, modelViewProjMatrix, 0);
-        // TODO: sphereRadius, color, etc...
+        // Set uniforms for sphereRadius, color, lightPosition, etc...
+        GLES20.glUniform1f(sphereRadiusHandle, sphereRadius);
+        GLES20.glUniform3f(sphereColorHandle, sphereColor[0], sphereColor[1], sphereColor[2]);
+        GLES20.glUniform3f(lightPositionHandle, lightPosition[0], lightPosition[1], lightPosition[2]);
 
         // In this case, glDrawArrays is the way to go, no vertex sharing = no use of glDrawElements.
         GLES20.glDrawArrays(GLES20.GL_POINTS, 0, number_of_vertices);
+        // TODO: is this still correct ^ given that I have both points + imposter coordinates?
 
         // At end of the drawing, unbind the buffer
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
@@ -311,12 +334,12 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
         sphereRadiusHandle = GLES20.glGetUniformLocation(mGlProgram, "sphereRadius");
         Log.d(TAG, "sphereRadius");
 
-        // TODO: setup initial sphere color, radius, lightPosition.
+        // setup initial sphere color, radius, lightPosition.
         sphereColor = new float[]{1.0f, 0.0f, 0.0f};
+        sphereRadius = 1.0f; // Not sure yet what to put for this : TODO
+        lightPosition = new float[]{right, top, near}; // Put at some interesting angle in front.
 
-        // orthographicMatrix = ..?  See: http://www.songho.ca/opengl/gl_projectionmatrix.html
-        // TODO: setup the orthographicMatrix.
-
+        // orthographic matrix initialized top.
     }
 
     /**
