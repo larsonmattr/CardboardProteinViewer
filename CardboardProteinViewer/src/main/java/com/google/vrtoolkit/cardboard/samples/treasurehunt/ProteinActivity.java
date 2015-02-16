@@ -94,11 +94,12 @@ public class ProteinActivity extends CardboardActivity implements CardboardView.
 
         GLES20.glUseProgram(mGlProgram);
 
+        // This location makes sense.
         mMVPMatrixHandle = GLES20.glGetUniformLocation(mGlProgram, "u_MVPMatrix");
 
         // Bind attributes
-        GLES20.glBindAttribLocation(mGlProgram, 0, "a_Position");
-        checkGLError("mPositionHandle");
+        // GLES20.glBindAttribLocation(mGlProgram, 0, "a_Position");
+        // checkGLError("mPositionHandle");
 
         // Build the camera matrix and apply it to the ModelView.
         Matrix.setLookAtM(mCamera, 0, 0.0f, 0.0f, CAMERA_Z, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
@@ -187,6 +188,8 @@ public class ProteinActivity extends CardboardActivity implements CardboardView.
         // Attach shaders
         GLES20.glAttachShader(mGlProgram, vertexShader);
         GLES20.glAttachShader(mGlProgram, fragmentShader);
+
+        GLES20.glBindAttribLocation(mGlProgram, 0, "a_Position");
 
         // Link the program
         GLES20.glLinkProgram(mGlProgram);

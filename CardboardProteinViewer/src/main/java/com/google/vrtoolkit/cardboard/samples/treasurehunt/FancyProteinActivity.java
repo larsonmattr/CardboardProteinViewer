@@ -11,10 +11,14 @@ import com.google.vrtoolkit.cardboard.EyeTransform;
 import com.google.vrtoolkit.cardboard.HeadTransform;
 import com.google.vrtoolkit.cardboard.Viewport;
 
+import org.biojava.bio.structure.Atom;
+
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
+import java.util.List;
 
 import javax.microedition.khronos.egl.EGLConfig;
 
@@ -26,7 +30,10 @@ import javax.microedition.khronos.egl.EGLConfig;
  */
 public class FancyProteinActivity extends CardboardActivity implements CardboardView.StereoRenderer {
 
-    public static final int BYTES_PER_FLOAT = 4;
+    /** Turn-on / Turn-off the logging */
+    public static final boolean DEBUG = true;
+
+    private static final int BYTES_PER_FLOAT = 4;
     private static final String TAG = "FancyProteinActivity";
     private static final float CAMERA_Z = 0.01f;
 
@@ -35,34 +42,39 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
     // and supply the relevant data members to OpenGL.
 
     // Address of our shader program
-    int mGlProgram;
+    private int mGlProgram;
+
+    // Trying to use a VAO
+    private int vaoHandle;
 
     // Attrib handles
-    int posHandle;
-    int inputImposterCoordHandle;
+    private int posHandle;
+    private int inputImpostorCoordHandle;
 
     // Uniform Handles for MVP matrix
-    int modelViewProjMatrixHandle;
-    int orthographicMatrixHandle;
-    int sphereRadiusHandle;
-    int lightPositionHandle;
-    int sphereColorHandle;
+    private int modelViewProjMatrixHandle;
+    private int orthographicMatrixHandle;
+    private int sphereRadiusHandle;
+    private int lightPositionHandle;
+    private int sphereColorHandle;
 
     //--------------------------------------------------
     // Account for what the Vertex Shader will require:
-    // Will hold two buffers of (Vec3 atoms, and Vec2 imposter)
-    int[] buffers;
+    // Will hold two buffers of (Vec3 atoms, and Vec2 impostor)
+    private int[] buffers;
 
     // Holding data to be loaded into the VBO.
     // BioJava to load a protein coordinates.
-    ProteinStructure protein;
-    int number_of_vertices;
+    private ProteinStructure protein;
+    private int number_of_vertices;
 
     // Will be our client-side Vec3 data to upload.
     private FloatBuffer atomVerticesVec3;
 
     // Perhaps this could be a float[] instead.
+    private final int billboard_pts = 4; // together will make a rectangle of two triangles.
     private FloatBuffer billboardData; // array of Vec2 positions
+
     //---------------------------------------------------
 
     // Uniforms used by both Vertex & Fragment shader
@@ -82,7 +94,7 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
                     0.0f,1.0f/top,0.0f,-(top+bottom)/(top-bottom),
                     0.0f,0.0f,-2.0f/(far-near),-(far+near)/(far-near),
                     0.0f,0.0f,0.0f,1.0f
-            };  // The matrix simplifies further, but nice to have it all laid out, and valid if viewport not symmetrical.
+            };  // The matrix can be simplified further, but nice to have it all laid out, and valid if viewport not symmetrical.
 
 
     // Uniforms used by Fragment shader only
@@ -123,17 +135,10 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
         // Check if GLSL program is valid & use the program
         // Then get handles for the various attributes/uniforms
         if (!GLES20.glIsProgram(mGlProgram)) {
-            Log.d(TAG, "onNewFrame: not a valid program");
+            if (DEBUG) Log.d(TAG, "onNewFrame: not a valid program");
         }
 
-        GLES20.glUseProgram(mGlProgram);
-
-        // Bind attributes
-        GLES20.glBindAttribLocation(mGlProgram, 0, "pos");
-        OpenGLHelper.checkGLError(TAG, "posHandle");
-
-        GLES20.glBindAttribLocation(mGlProgram, 1, "inputImpostorCoord");
-        OpenGLHelper.checkGLError(TAG, "inputImpostorCoordHandle");
+        OpenGLHelper.checkGLError(TAG, "glUseProgram");
 
         // Setup Uniform handles - sphere vertex shader
         modelViewProjMatrixHandle = GLES20.glGetUniformLocation(mGlProgram, "modelViewProjMatrix");
@@ -160,11 +165,35 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
         // eventually, protein model shouldn't move from the view, but should only rotate.
         // ie, apply only a rotate of mModel?
 
-        /*
-        // Why is this handle set here, but uniform handle set elsewhere?
-        mPositionHandle = GLES20.glGetAttribLocation(mGlProgram, "a_Position");
-        Log.d(TAG, "mPositionHandle = " + mPositionHandle);
-        */
+        // Get the handles needed.
+        posHandle = GLES20.glGetAttribLocation(mGlProgram, "pos");
+        Log.d(TAG, "posHandle=" + posHandle);
+        OpenGLHelper.checkGLError(TAG, "posHandle");
+
+        inputImpostorCoordHandle = GLES20.glGetAttribLocation(mGlProgram, "inputImpostorCoord");
+        Log.d(TAG, "inputImpostorCoord=" + inputImpostorCoordHandle);
+        OpenGLHelper.checkGLError(TAG, "inputImposterCoord");
+
+        /**
+         * Non-uniform is the vertices of the atom coordinates
+         * Set uniform handles, uniforms are for matrices applied to the vertices
+         *** Do not need to use glGetProgram before glGetUniformLocation.
+         */
+        lightPositionHandle = GLES20.glGetUniformLocation(mGlProgram, "lightPosition");
+        Log.d(TAG, "lightPositionHandle = " + lightPositionHandle);
+
+        sphereColorHandle = GLES20.glGetUniformLocation(mGlProgram, "sphereColor");
+        Log.d(TAG, "sphereColorHandle = " + sphereColorHandle);
+
+        modelViewProjMatrixHandle = GLES20.glGetUniformLocation(mGlProgram, "modelViewProjMatrix");
+        Log.d(TAG, "modelViewProjMatrixHandle = " + modelViewProjMatrixHandle);
+
+        orthographicMatrixHandle = GLES20.glGetUniformLocation(mGlProgram, "orthographicMatrix");
+        Log.d(TAG, "orthographicMatrixHandle = " + orthographicMatrixHandle);
+
+        sphereRadiusHandle = GLES20.glGetUniformLocation(mGlProgram, "sphereRadius");
+        OpenGLHelper.checkGLError(TAG, "sphereRadius");
+        Log.d(TAG, "sphereRadiusHandle = " + sphereRadiusHandle);
 
         // Apply the eye transformation to the camera.
         Matrix.multiplyMM(mView, 0, eyeTransform.getEyeView(), 0, mCamera, 0);
@@ -174,6 +203,8 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
         Matrix.multiplyMM(modelViewProjMatrix, 0, eyeTransform.getPerspective(), 0,
                 mModelView, 0);
 
+        // Log.d(TAG, "modelViewProjMatrix: " + modelViewProjMatrix.toString());
+
         drawProtein();
     }
 
@@ -181,42 +212,50 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
      * draw calls to display the protein.
      */
     public void drawProtein() {
+        GLES20.glUseProgram(mGlProgram);
+        OpenGLHelper.checkGLError(TAG, "glUseProgram");
 
         // How many floats describe a position (Vec3 = 3).
         int POSITION_DATA_SIZE = 3; // vec3
         int BILLBOARD_DATA_SIZE = 2; // vec2
 
+        // Both the pos and impostorCoord arrays need to have equal # vertices.
+
         // Draw should look something like this.
         // glBindBuffer, then glEnableVertexAttribArray, then glVertexAttribPointer..
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, buffers[0]);
-
-        // mPositionHandle = reference to the a_Position of the simple vertex shader.
-        GLES20.glEnableVertexAttribArray(posHandle);
         GLES20.glVertexAttribPointer(posHandle, POSITION_DATA_SIZE, GLES20.GL_FLOAT, false, 0, 0);
-
-        // Check be the last of a set of handles
-        OpenGLHelper.checkGLError(TAG, "mPositionHandle");
+        GLES20.glEnableVertexAttribArray(posHandle);
+        if (DEBUG) OpenGLHelper.checkGLError(TAG, "posHandle");
 
         // set the billboard handles
-        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, buffers[1]);
-        GLES20.glEnableVertexAttribArray(inputImposterCoordHandle);
-        GLES20.glVertexAttribPointer(inputImposterCoordHandle, BILLBOARD_DATA_SIZE, GLES20.GL_FLOAT, false, 0, 0);
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, buffers[1]); // second param describes the buffer index.
+        if (DEBUG) OpenGLHelper.checkGLError(TAG, "inputImpostorCoordHandle-bindBuffer");
+        GLES20.glVertexAttribPointer(inputImpostorCoordHandle, BILLBOARD_DATA_SIZE, GLES20.GL_FLOAT, false, 0, 0);
+        if (DEBUG) OpenGLHelper.checkGLError(TAG, "inputImpostorCoordHandle-attribPointer");
+        GLES20.glEnableVertexAttribArray(inputImpostorCoordHandle);
+        if (DEBUG) OpenGLHelper.checkGLError(TAG, "inputImpostorCoordHandle-enablevertexattribarray");
 
         // Set ALL the uniform handles
         // Set the MVP matrix.
         GLES20.glUniformMatrix4fv(modelViewProjMatrixHandle, 1, false, modelViewProjMatrix, 0);
+        GLES20.glUniformMatrix4fv(orthographicMatrixHandle, 1, false, orthographicMatrix, 0);
+
         // Set uniforms for sphereRadius, color, lightPosition, etc...
         GLES20.glUniform1f(sphereRadiusHandle, sphereRadius);
         GLES20.glUniform3f(sphereColorHandle, sphereColor[0], sphereColor[1], sphereColor[2]);
         GLES20.glUniform3f(lightPositionHandle, lightPosition[0], lightPosition[1], lightPosition[2]);
 
-        // In this case, glDrawArrays is the way to go, no vertex sharing = no use of glDrawElements.
-        GLES20.glDrawArrays(GLES20.GL_POINTS, 0, number_of_vertices);
-        // TODO: is this still correct ^ given that I have both points + imposter coordinates?
+        if (DEBUG) OpenGLHelper.checkGLError(TAG, "Drawing, set uniforms.");
+
+        // Draw the list of spheres using indices with glDrawElements
+        //GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, number_of_vertices);
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 3);
+        // Getting error 1282!
 
         // At end of the drawing, unbind the buffer
-        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
-        OpenGLHelper.checkGLError(TAG, "Drawing protein");
+        // GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
+        if (DEBUG) OpenGLHelper.checkGLError(TAG, "Drawing protein");
     }
 
     /**
@@ -237,7 +276,7 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
     /**
      * Setup the shader
      */
-    void initOpenGL() {
+    void setupShader() {
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 0.5f); // Dark background so text shows up well
 
         /*
@@ -248,9 +287,11 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
         */
 
         // One added step, creating inputStreams...
+
         InputStream vertShaderStream = getResources().openRawResource(R.raw.sphere_vertex);
         InputStream fragShaderStream = getResources().openRawResource(R.raw.sphere_fragment);
 
+        // Load and compile shaders.
         int vertexShader = OpenGLHelper.loadGLShader(TAG, GLES20.GL_VERTEX_SHADER, vertShaderStream);
         int fragmentShader = OpenGLHelper.loadGLShader(TAG, GLES20.GL_FRAGMENT_SHADER, fragShaderStream);
 
@@ -261,24 +302,53 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
         GLES20.glAttachShader(mGlProgram, vertexShader);
         GLES20.glAttachShader(mGlProgram, fragmentShader);
 
+        // Bind attribute location we will use before wrapping up with linking the shaders.
+        GLES20.glBindAttribLocation(mGlProgram, 0, "pos");
+        OpenGLHelper.checkGLError(TAG, "glBindAttribLocation");
+        GLES20.glBindAttribLocation(mGlProgram, 1, "inputImpostorCoord");
+        OpenGLHelper.checkGLError(TAG, "glBindAttribLocation");
+
         // Link the program
         GLES20.glLinkProgram(mGlProgram);
+
+        // Check if programs compiled and linked successfully.
+        int[] linkStatus = new int[1];
+        GLES20.glGetProgramiv(mGlProgram, GLES20.GL_LINK_STATUS, linkStatus, 0);
+        if (linkStatus[0] != GLES20.GL_TRUE) {
+            Log.e(TAG, "Could not link program: ");
+            Log.e(TAG, GLES20.glGetProgramInfoLog(mGlProgram));
+            GLES20.glDeleteProgram(mGlProgram);
+            mGlProgram = 0;
+        }
+
+        if (DEBUG) Log.d(TAG, "Created and linked the shaders.");
+    }
+
+    /**
+     * Setup the OpenGL shader program and buffers.
+     */
+    void initOpenGL() {
+
+        setupShader();
 
         /**
          * Create a float buffer from ByteBuffer for
          *  representing a protein structure as a model.
+         *  Right now, just using my test PDB. TODO: make general.
          */
         protein = new ProteinStructure(getApplicationContext());
 
         // Allocates and copies in coordinates in a Vec3 of floats.
-        atomVerticesVec3 = protein.getVertices("A");
-        atomVerticesVec3.position(0);
+        // Get the atoms from chain A
+        List<Atom> atoms = protein.getAtoms(protein.getAtomGroups("A"));
+        atomVerticesVec3 = setupCoordinateVertices(atoms);
 
         // 3 floats per vertex, want to know # of vertices.
-        number_of_vertices = atomVerticesVec3.capacity() / 3;
+        int number_of_atoms = atoms.size();
+        number_of_vertices = number_of_atoms * billboard_pts;
 
         // Allocate memory & setup the FloatBuffer with coordinates.
-        billboardData = setupBillboard();
+        billboardData = setupBillboard(number_of_atoms);
 
         // Setup Object Matrices
         // Object first appears directly in front of user
@@ -290,81 +360,119 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
         // Generate 2 buffers
         GLES20.glGenBuffers(2, buffers, 0);
 
-        // These will be the handles for vertex attribs
-        posHandle = 0;
-        inputImposterCoordHandle = 1;
-
         // Bind to the buffer for atom vertices.
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, buffers[0]);
 
+        if (DEBUG) Log.d(TAG, "client buffer size: " + atomVerticesVec3.capacity() + ", glBuffer size: " + (number_of_vertices * 3));
         // Transfer the client data into the gpu memory
+
         GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER, atomVerticesVec3.capacity() * BYTES_PER_FLOAT,
                 atomVerticesVec3, GLES20.GL_STATIC_DRAW);
 
-        //  Unbind from the buffer when we are done setting up.
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
 
         // Bind to the buffer for impostor billboard
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, buffers[1]);
 
+        Log.d(TAG, "client buffer size: " + billboardData.capacity() + ", glBuffer size: " + (number_of_vertices * 2));
+        billboardData.position(0);
+
         // Transfer the client data into the gpu memory (Vec2 of 4 billboard coordinates).
-        GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER, 4 * 2 * BYTES_PER_FLOAT,
+        GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER, billboardData.capacity() * BYTES_PER_FLOAT,
                 billboardData, GLES20.GL_STATIC_DRAW);
 
         //  Unbind from the buffer when we are done setting up.
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
 
-        /**
-         * Non-uniform is the vertices of the atom coordinates
-         * Set uniform handles, uniforms are for matrices applied to the vertices
-         * and
-         */
-        lightPositionHandle = GLES20.glGetUniformLocation(mGlProgram, "lightPosition");
-        Log.d(TAG, "lightPositionHandle = " + lightPositionHandle);
-
-        sphereColorHandle = GLES20.glGetUniformLocation(mGlProgram, "sphereColor");
-        Log.d(TAG, "sphereColor");
-
-        modelViewProjMatrixHandle = GLES20.glGetUniformLocation(mGlProgram, "modelViewProjMatrix");
-        Log.d(TAG, "modelViewProjMatrix");
-
-        orthographicMatrixHandle = GLES20.glGetUniformLocation(mGlProgram, "orthographicMatrix");
-        Log.d(TAG, "orthographicMatrix");
-
-        sphereRadiusHandle = GLES20.glGetUniformLocation(mGlProgram, "sphereRadius");
-        Log.d(TAG, "sphereRadius");
-
         // setup initial sphere color, radius, lightPosition.
         sphereColor = new float[]{1.0f, 0.0f, 0.0f};
         sphereRadius = 1.0f; // Not sure yet what to put for this : TODO
         lightPosition = new float[]{right, top, near}; // Put at some interesting angle in front.
-
-        // orthographic matrix initialized top.
     }
 
     /**
+     * Create billboarding coordinates, 4 coordinates * N spheres.
+     *
      * Make a billboard like GPU gems 3 chapter 21, a four corner square.
      * @return a 4xVec2 billboard.
      */
-    public FloatBuffer setupBillboard() {
+    public FloatBuffer setupBillboard(int spheres) {
         /**
          * Create a float buffer for representing the billboard.
          * 4 Vec2 vertices [(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)]
          */
-        int number_coords = 4;
-        int floats_per = 2;
+        int floats_per = 2; // vec2
 
-        FloatBuffer billboardData = ByteBuffer.allocateDirect(number_coords * BYTES_PER_FLOAT * floats_per)
+        FloatBuffer billboardData = ByteBuffer.allocateDirect(spheres * billboard_pts * BYTES_PER_FLOAT * floats_per)
                 .order(ByteOrder.nativeOrder())
                 .asFloatBuffer();
 
-        // Setup the billboard coordinates.
-        billboardData.put(0, (float) -1.0);  billboardData.put(1, (float) 1.0);  // top-left
-        billboardData.put(2, (float) 1.0);  billboardData.put(3, (float) 1.0); // top-right
-        billboardData.put(4, (float) -1.0);  billboardData.put(5, (float) -1.0);  //bottom-left
-        billboardData.put(6, (float) 1.0);  billboardData.put(7, (float) -1.0);  //bottom-right
+        // Move to start.
+        int currentPosition = 0;
 
+        // Setup the billboard coordinates.
+        for (int i = 0; i < spheres; i++) {
+            billboardData.put(currentPosition++, -1.0f); billboardData.put(currentPosition++, 1.0f);  // top-left
+            billboardData.put(currentPosition++, 1.0f);  billboardData.put(currentPosition++, 1.0f); // top-right
+            billboardData.put(currentPosition++, -1.0f); billboardData.put(currentPosition++, -1.0f);  //bottom-left
+            billboardData.put(currentPosition++, 1.0f);  billboardData.put(currentPosition++, -1.0f);  //bottom-right
+        }
+        Log.d(TAG, "setupBillboard: final value " + currentPosition);
+
+        billboardData.position(0);
         return billboardData;
+    }
+
+    /**
+     * Builds a repeated
+     * @param atoms
+     * @return
+     */
+    public FloatBuffer setupCoordinateVertices(List<Atom> atoms) {
+        int coords_per_billboard = 4;
+        int floats_per = 3; // vec3
+        FloatBuffer vertexData = ByteBuffer.allocateDirect(atoms.size() * coords_per_billboard * BYTES_PER_FLOAT * floats_per)
+                .order(ByteOrder.nativeOrder())
+                .asFloatBuffer();
+
+        int current_Position = 0;
+
+        for (int i = 0; i < atoms.size(); i++) {
+            for (int j = 0; j < coords_per_billboard; j++) {
+                Atom atom = atoms.get(i);
+                vertexData.put(current_Position++, (float) atom.getX());
+                vertexData.put(current_Position++, (float) atom.getY());
+                vertexData.put(current_Position++, (float) atom.getZ());
+            }
+        }
+
+        vertexData.position(0);
+
+        return vertexData;
+    }
+
+    /**
+     * For debugging my FloatBuffer vectors;
+     * @param vertices
+     * @param vector_type
+     * @param buffer
+     */
+    public void describeFloatBuffer(int vertices, int vector_type, FloatBuffer buffer) {
+        int current_position = 0;
+        for (int i = 0; i < vertices; i++) {
+            StringBuilder str = new StringBuilder();
+            str.append("Vector " + i + ": (");
+            boolean comma = false;
+            for (int j = 0; j < vector_type; j++) {
+                if (comma) str.append(", ");
+                Float current = buffer.get(current_position);
+                str.append(current.toString());
+                comma = true;
+                current_position++;
+            }
+            str.append(")");
+            Log.d(TAG, str.toString());
+        }
     }
 
     /**
@@ -375,6 +483,8 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
     public void onSurfaceCreated(EGLConfig eglConfig) {
         Log.i(TAG, "onSurfaceCreated");
         initOpenGL();
+
+
     }
 
     /**
