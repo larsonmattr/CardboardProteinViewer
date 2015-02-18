@@ -72,7 +72,7 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
     private FloatBuffer atomVerticesVec3;
 
     // Perhaps this could be a float[] instead.
-    private final int billboard_pts = 4; // together will make a rectangle of two triangles.
+    private final int billboard_pts = 6; // together will make a rectangle of two triangles.
     private FloatBuffer billboardData; // array of Vec2 positions
 
     //---------------------------------------------------
@@ -109,7 +109,7 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
     private float[] mModelProtein = new float[16];
 
     // Distance to the protein
-    private float mObjectDistance = 12f;
+    private float mObjectDistance = 22f;
 
     // Contains 2 subviews to do stereo viewport.
     private CardboardOverlayView mOverlayView;
@@ -138,7 +138,8 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
             if (DEBUG) Log.d(TAG, "onNewFrame: not a valid program");
         }
 
-        OpenGLHelper.checkGLError(TAG, "glUseProgram");
+        GLES20.glUseProgram(mGlProgram);
+        //OpenGLHelper.checkGLError(TAG, "glUseProgram");
 
         // Setup Uniform handles - sphere vertex shader
         modelViewProjMatrixHandle = GLES20.glGetUniformLocation(mGlProgram, "modelViewProjMatrix");
@@ -150,7 +151,23 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
         sphereColorHandle = GLES20.glGetUniformLocation(mGlProgram, "sphereColor");
 
         // Build the camera matrix and apply it to the ModelView.
+
+        float center_x = 0.0f;
+        float center_y = 0.0f;
+        float center_z = 0.0f;
+
+        // If at least one point, make that the view center at start.
+
+        if (atomVerticesVec3.capacity() > 2) {
+            center_x = atomVerticesVec3.get(0);
+            center_y = atomVerticesVec3.get(1);
+            center_z = atomVerticesVec3.get(2);
+        }
+
+
         Matrix.setLookAtM(mCamera, 0, 0.0f, 0.0f, CAMERA_Z, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+        //Matrix.setLookAtM(mCamera, 0, center_x, center_y, center_z, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+
 
         headTransform.getHeadView(mHeadView, 0);
 
@@ -164,14 +181,14 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
         // TODO: update the implementation of the mMVP matrices
         // eventually, protein model shouldn't move from the view, but should only rotate.
         // ie, apply only a rotate of mModel?
-
+        GLES20.glUseProgram(mGlProgram);
         // Get the handles needed.
         posHandle = GLES20.glGetAttribLocation(mGlProgram, "pos");
-        Log.d(TAG, "posHandle=" + posHandle);
+        // Log.d(TAG, "posHandle=" + posHandle);
         OpenGLHelper.checkGLError(TAG, "posHandle");
 
         inputImpostorCoordHandle = GLES20.glGetAttribLocation(mGlProgram, "inputImpostorCoord");
-        Log.d(TAG, "inputImpostorCoord=" + inputImpostorCoordHandle);
+        // Log.d(TAG, "inputImpostorCoordHandle=" + inputImpostorCoordHandle);
         OpenGLHelper.checkGLError(TAG, "inputImposterCoord");
 
         /**
@@ -180,20 +197,20 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
          *** Do not need to use glGetProgram before glGetUniformLocation.
          */
         lightPositionHandle = GLES20.glGetUniformLocation(mGlProgram, "lightPosition");
-        Log.d(TAG, "lightPositionHandle = " + lightPositionHandle);
+//        Log.d(TAG, "lightPositionHandle = " + lightPositionHandle);
 
         sphereColorHandle = GLES20.glGetUniformLocation(mGlProgram, "sphereColor");
-        Log.d(TAG, "sphereColorHandle = " + sphereColorHandle);
+//        Log.d(TAG, "sphereColorHandle = " + sphereColorHandle);
 
         modelViewProjMatrixHandle = GLES20.glGetUniformLocation(mGlProgram, "modelViewProjMatrix");
-        Log.d(TAG, "modelViewProjMatrixHandle = " + modelViewProjMatrixHandle);
+//        Log.d(TAG, "modelViewProjMatrixHandle = " + modelViewProjMatrixHandle);
 
         orthographicMatrixHandle = GLES20.glGetUniformLocation(mGlProgram, "orthographicMatrix");
-        Log.d(TAG, "orthographicMatrixHandle = " + orthographicMatrixHandle);
+//        Log.d(TAG, "orthographicMatrixHandle = " + orthographicMatrixHandle);
 
         sphereRadiusHandle = GLES20.glGetUniformLocation(mGlProgram, "sphereRadius");
         OpenGLHelper.checkGLError(TAG, "sphereRadius");
-        Log.d(TAG, "sphereRadiusHandle = " + sphereRadiusHandle);
+//        Log.d(TAG, "sphereRadiusHandle = " + sphereRadiusHandle);
 
         // Apply the eye transformation to the camera.
         Matrix.multiplyMM(mView, 0, eyeTransform.getEyeView(), 0, mCamera, 0);
@@ -250,8 +267,9 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
 
         // Draw the list of spheres using indices with glDrawElements
         //GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, number_of_vertices);
-        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 3);
+        // GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, number_of_vertices);
         // Getting error 1282!
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, number_of_vertices);
 
         // At end of the drawing, unbind the buffer
         // GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
@@ -303,10 +321,12 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
         GLES20.glAttachShader(mGlProgram, fragmentShader);
 
         // Bind attribute location we will use before wrapping up with linking the shaders.
+        /*
         GLES20.glBindAttribLocation(mGlProgram, 0, "pos");
         OpenGLHelper.checkGLError(TAG, "glBindAttribLocation");
         GLES20.glBindAttribLocation(mGlProgram, 1, "inputImpostorCoord");
         OpenGLHelper.checkGLError(TAG, "glBindAttribLocation");
+        */
 
         // Link the program
         GLES20.glLinkProgram(mGlProgram);
@@ -321,7 +341,7 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
             mGlProgram = 0;
         }
 
-        if (DEBUG) Log.d(TAG, "Created and linked the shaders.");
+        if (DEBUG) Log.d(TAG, "Created and linked the shaders, mGlProgram=" + mGlProgram);
     }
 
     /**
@@ -349,6 +369,8 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
 
         // Allocate memory & setup the FloatBuffer with coordinates.
         billboardData = setupBillboard(number_of_atoms);
+
+        describeTriangles(12, atomVerticesVec3, billboardData);
 
         // Setup Object Matrices
         // Object first appears directly in front of user
@@ -386,7 +408,7 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
 
         // setup initial sphere color, radius, lightPosition.
         sphereColor = new float[]{1.0f, 0.0f, 0.0f};
-        sphereRadius = 1.0f; // Not sure yet what to put for this : TODO
+        sphereRadius = 1.5f; // Not sure yet what to put for this : TODO  1.5angstrom might be ok
         lightPosition = new float[]{right, top, near}; // Put at some interesting angle in front.
     }
 
@@ -412,10 +434,21 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
 
         // Setup the billboard coordinates.
         for (int i = 0; i < spheres; i++) {
+            // Provide the faces in counter-clockwise order.
+            /*
             billboardData.put(currentPosition++, -1.0f); billboardData.put(currentPosition++, 1.0f);  // top-left
+            billboardData.put(currentPosition++, -1.0f); billboardData.put(currentPosition++, -1.0f);  //bottom-left
+            billboardData.put(currentPosition++, 1.0f);  billboardData.put(currentPosition++, 1.0f); // top-right
+            billboardData.put(currentPosition++, 1.0f);  billboardData.put(currentPosition++, -1.0f);  //bottom-right
             billboardData.put(currentPosition++, 1.0f);  billboardData.put(currentPosition++, 1.0f); // top-right
             billboardData.put(currentPosition++, -1.0f); billboardData.put(currentPosition++, -1.0f);  //bottom-left
+            */
+            billboardData.put(currentPosition++, -1.0f); billboardData.put(currentPosition++, -1.0f);  //bottom-left
+            billboardData.put(currentPosition++, -1.0f); billboardData.put(currentPosition++, 1.0f);  // top-left
+            billboardData.put(currentPosition++, 1.0f);  billboardData.put(currentPosition++, 1.0f); // top-right
+            billboardData.put(currentPosition++, 1.0f);  billboardData.put(currentPosition++, 1.0f); // top-right
             billboardData.put(currentPosition++, 1.0f);  billboardData.put(currentPosition++, -1.0f);  //bottom-right
+            billboardData.put(currentPosition++, -1.0f); billboardData.put(currentPosition++, -1.0f);  //bottom-left
         }
         Log.d(TAG, "setupBillboard: final value " + currentPosition);
 
@@ -429,16 +462,15 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
      * @return
      */
     public FloatBuffer setupCoordinateVertices(List<Atom> atoms) {
-        int coords_per_billboard = 4;
         int floats_per = 3; // vec3
-        FloatBuffer vertexData = ByteBuffer.allocateDirect(atoms.size() * coords_per_billboard * BYTES_PER_FLOAT * floats_per)
+        FloatBuffer vertexData = ByteBuffer.allocateDirect(atoms.size() * billboard_pts * BYTES_PER_FLOAT * floats_per)
                 .order(ByteOrder.nativeOrder())
                 .asFloatBuffer();
 
         int current_Position = 0;
 
         for (int i = 0; i < atoms.size(); i++) {
-            for (int j = 0; j < coords_per_billboard; j++) {
+            for (int j = 0; j < billboard_pts; j++) {
                 Atom atom = atoms.get(i);
                 vertexData.put(current_Position++, (float) atom.getX());
                 vertexData.put(current_Position++, (float) atom.getY());
@@ -471,6 +503,26 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
                 current_position++;
             }
             str.append(")");
+            Log.d(TAG, str.toString());
+        }
+    }
+
+    public void describeTriangles(int vertices, FloatBuffer positions, FloatBuffer billBoard) {
+        int current_pos = 0;
+        int current_billboard = 0;
+        for (int i = 0; i < vertices; i++) {
+            StringBuilder str = new StringBuilder();
+            str.append("Vector " + i + ": (");
+            float x = positions.get(current_pos);
+            float y = positions.get(current_pos+1);
+            float z = positions.get(current_pos+2);
+            current_pos += 3;
+            float dx = billBoard.get(current_billboard);
+            float dy = billBoard.get(current_billboard+1);
+            current_billboard+=2;
+            x+=dx;
+            y+=dy;
+            str.append(x + ", " + y + ", " + z + ")");
             Log.d(TAG, str.toString());
         }
     }
