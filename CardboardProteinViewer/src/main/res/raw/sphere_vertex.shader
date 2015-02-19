@@ -21,7 +21,7 @@ void main() {
 	//tp.xy = tp.xy + inputImpostorCoord.xy * vec2(sphereRadius);
 	tp.x = tp.x + inputImpostorCoord.x * sphereRadius;
 	tp.y = tp.y + inputImpostorCoord.y * sphereRadius;
-	tp = tp * orthographicMatrix;
+	// tp = tp * orthographicMatrix;  // Either my orthographic matrix is incorrect..
 	normalizedViewCoord = (tp.xyz + 1.0) / 2.0;
 	gl_Position = tp;
 }

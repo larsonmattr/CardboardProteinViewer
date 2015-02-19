@@ -109,7 +109,7 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
     private float[] mModelProtein = new float[16];
 
     // Distance to the protein
-    private float mObjectDistance = 22f;
+    private float mObjectDistance = 12f;
 
     // Contains 2 subviews to do stereo viewport.
     private CardboardOverlayView mOverlayView;
@@ -409,7 +409,8 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
         // setup initial sphere color, radius, lightPosition.
         sphereColor = new float[]{1.0f, 0.0f, 0.0f};
         sphereRadius = 1.5f; // Not sure yet what to put for this : TODO  1.5angstrom might be ok
-        lightPosition = new float[]{right, top, near}; // Put at some interesting angle in front.
+        //lightPosition = new float[]{right, top, near}; // Put at some interesting angle in front.
+        lightPosition = new float[]{0.5f, 0.5f, 0.5f};
     }
 
     /**
@@ -535,7 +536,8 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
     public void onSurfaceCreated(EGLConfig eglConfig) {
         Log.i(TAG, "onSurfaceCreated");
         initOpenGL();
-
+        GLES20.glEnable(GLES20.GL_DEPTH_TEST);
+        // GLES20.glDepthFunc(GLES20.GL_NEVER);
 
     }
 
