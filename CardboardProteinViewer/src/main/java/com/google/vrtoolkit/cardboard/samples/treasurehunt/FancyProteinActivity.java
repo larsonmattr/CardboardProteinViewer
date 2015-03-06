@@ -49,6 +49,7 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
 
     // Attrib handles
     private int posHandle;
+    private int colorHandle;
     private int inputImpostorCoordHandle;
 
     // Uniform Handles for MVP matrix
@@ -70,6 +71,8 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
 
     // Will be our client-side Vec3 data to upload.
     private FloatBuffer atomVerticesVec3;
+
+    private FloatBuffer colorVec3;
 
     // Perhaps this could be a float[] instead.
     private final int billboard_pts = 6; // together will make a rectangle of two triangles.
@@ -113,8 +116,6 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
 
     // Contains 2 subviews to do stereo viewport.
     private CardboardOverlayView mOverlayView;
-
-
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -182,10 +183,16 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
         // eventually, protein model shouldn't move from the view, but should only rotate.
         // ie, apply only a rotate of mModel?
         GLES20.glUseProgram(mGlProgram);
+
         // Get the handles needed.
         posHandle = GLES20.glGetAttribLocation(mGlProgram, "pos");
         // Log.d(TAG, "posHandle=" + posHandle);
         OpenGLHelper.checkGLError(TAG, "posHandle");
+
+        // Get the handles needed.
+        colorHandle = GLES20.glGetAttribLocation(mGlProgram, "colorCoord");
+        // Log.d(TAG, "posHandle=" + posHandle);
+        OpenGLHelper.checkGLError(TAG, "colorHandle");
 
         inputImpostorCoordHandle = GLES20.glGetAttribLocation(mGlProgram, "inputImpostorCoord");
         // Log.d(TAG, "inputImpostorCoordHandle=" + inputImpostorCoordHandle);
@@ -234,6 +241,7 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
 
         // How many floats describe a position (Vec3 = 3).
         int POSITION_DATA_SIZE = 3; // vec3
+        int COLOR_DATA_SIZE = 3; // vec3
         int BILLBOARD_DATA_SIZE = 2; // vec2
 
         // Both the pos and impostorCoord arrays need to have equal # vertices.
@@ -245,8 +253,13 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
         GLES20.glEnableVertexAttribArray(posHandle);
         if (DEBUG) OpenGLHelper.checkGLError(TAG, "posHandle");
 
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, buffers[1]);
+        GLES20.glVertexAttribPointer(colorHandle, COLOR_DATA_SIZE, GLES20.GL_FLOAT, false, 0, 0);
+        GLES20.glEnableVertexAttribArray(colorHandle);
+        if (DEBUG) OpenGLHelper.checkGLError(TAG, "colorHandle");
+
         // set the billboard handles
-        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, buffers[1]); // second param describes the buffer index.
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, buffers[2]); // second param describes the buffer index.
         if (DEBUG) OpenGLHelper.checkGLError(TAG, "inputImpostorCoordHandle-bindBuffer");
         GLES20.glVertexAttribPointer(inputImpostorCoordHandle, BILLBOARD_DATA_SIZE, GLES20.GL_FLOAT, false, 0, 0);
         if (DEBUG) OpenGLHelper.checkGLError(TAG, "inputImpostorCoordHandle-attribPointer");
@@ -362,6 +375,7 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
         // Get the atoms from chain A
         List<Atom> atoms = protein.getAtoms(protein.getAtomGroups("A"));
         atomVerticesVec3 = setupCoordinateVertices(atoms);
+        colorVec3 = setupColorVertices(atoms);
 
         // 3 floats per vertex, want to know # of vertices.
         int number_of_atoms = atoms.size();
@@ -378,9 +392,9 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
         Matrix.translateM(mModelProtein, 0, 0, 0, -mObjectDistance);
 
         // Setup atomVertices as a VBO.
-        buffers = new int[2];
+        buffers = new int[3];
         // Generate 2 buffers
-        GLES20.glGenBuffers(2, buffers, 0);
+        GLES20.glGenBuffers(3, buffers, 0);
 
         // Bind to the buffer for atom vertices.
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, buffers[0]);
@@ -393,10 +407,22 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
 
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
 
-        // Bind to the buffer for impostor billboard
+        // Bind to the buffer for atom vertices.
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, buffers[1]);
 
-        Log.d(TAG, "client buffer size: " + billboardData.capacity() + ", glBuffer size: " + (number_of_vertices * 2));
+        if (DEBUG) Log.d(TAG, "color buffer size: " + colorVec3.capacity() + ", glBuffer size: " + (number_of_vertices * 3));
+        // Transfer the client data into the gpu memory
+
+        GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER, colorVec3.capacity() * BYTES_PER_FLOAT,
+                colorVec3, GLES20.GL_STATIC_DRAW);
+
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
+
+
+        // Bind to the buffer for impostor billboard
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, buffers[2]);
+
+        if (DEBUG) Log.d(TAG, "billboard buffer size: " + billboardData.capacity() + ", glBuffer size: " + (number_of_vertices * 2));
         billboardData.position(0);
 
         // Transfer the client data into the gpu memory (Vec2 of 4 billboard coordinates).
@@ -451,7 +477,7 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
             billboardData.put(currentPosition++, 1.0f);  billboardData.put(currentPosition++, -1.0f);  //bottom-right
             billboardData.put(currentPosition++, -1.0f); billboardData.put(currentPosition++, -1.0f);  //bottom-left
         }
-        Log.d(TAG, "setupBillboard: final value " + currentPosition);
+        if (DEBUG) Log.d(TAG, "setupBillboard: final value " + currentPosition);
 
         billboardData.position(0);
         return billboardData;
@@ -484,6 +510,49 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
         return vertexData;
     }
 
+    public FloatBuffer setupColorVertices(List<Atom> atoms) {
+        int floats_per = 3; //vec3
+        FloatBuffer colorData = ByteBuffer.allocateDirect(atoms.size() * billboard_pts * BYTES_PER_FLOAT * floats_per)
+                .order(ByteOrder.nativeOrder())
+                .asFloatBuffer();
+
+        int current_Position = 0;
+
+        for (int i = 0; i < atoms.size(); i++) {
+            for (int j = 0; j < billboard_pts; j++) {
+                Atom atom = atoms.get(i);
+
+                switch (atom.getElement()) {
+                    case C:
+                        colorData.put(current_Position++, (float) 1.0);
+                        colorData.put(current_Position++, (float) 1.0);
+                        colorData.put(current_Position++, (float) 1.0);
+                        break;
+                    case O:
+                        colorData.put(current_Position++, (float) 1.0);
+                        colorData.put(current_Position++, (float) 0.0);
+                        colorData.put(current_Position++, (float) 0.0);
+                        break;
+                    case N:
+                        colorData.put(current_Position++, (float) 0.0);
+                        colorData.put(current_Position++, (float) 1.0);
+                        colorData.put(current_Position++, (float) 0.0);
+                        break;
+                    default:
+                        colorData.put(current_Position++, (float) 0.0);
+                        colorData.put(current_Position++, (float) 0.0);
+                        colorData.put(current_Position++, (float) 1.0);
+                        break;
+                }
+            }
+        }
+
+        colorData.position(0);
+
+        return colorData;
+    }
+
+
     /**
      * For debugging my FloatBuffer vectors;
      * @param vertices
@@ -504,7 +573,7 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
                 current_position++;
             }
             str.append(")");
-            Log.d(TAG, str.toString());
+            if (DEBUG) Log.d(TAG, str.toString());
         }
     }
 
@@ -524,7 +593,7 @@ public class FancyProteinActivity extends CardboardActivity implements Cardboard
             x+=dx;
             y+=dy;
             str.append(x + ", " + y + ", " + z + ")");
-            Log.d(TAG, str.toString());
+            if (DEBUG) Log.d(TAG, str.toString());
         }
     }
 

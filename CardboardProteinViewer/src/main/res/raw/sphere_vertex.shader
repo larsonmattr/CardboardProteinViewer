@@ -1,6 +1,7 @@
 // Pass it a vec3 or vec4 FloatBuffer of atom positions.
 attribute vec4 pos;
 attribute vec4 inputImpostorCoord;
+attribute vec4 colorCoord;
 // Pass it a vec2 of FloatBuffer of impostor corner positions
 
 // Pass these on to the fragment shader.
@@ -8,6 +9,7 @@ attribute vec4 inputImpostorCoord;
 varying vec2 impostorCoord;
 // normalized
 varying vec3 normalizedViewCoord;
+varying vec3 color;
 
 // Provide a single matrix for rotations of model/camera/projection.
 uniform mat4 modelViewProjMatrix;
@@ -23,5 +25,6 @@ void main() {
 	tp.y = tp.y + inputImpostorCoord.y * sphereRadius;
 	// tp = tp * orthographicMatrix;  // Either my orthographic matrix is incorrect..
 	normalizedViewCoord = (tp.xyz + 1.0) / 2.0;
+	color = colorCoord.xyz;
 	gl_Position = tp;
 }

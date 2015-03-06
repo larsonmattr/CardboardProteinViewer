@@ -11,6 +11,7 @@ uniform mediump float sphereRadius;
 // Created by sphere_vertex.shader
 varying vec2 impostorCoord;
 varying vec3 normalizedViewCoord;
+varying vec3 color;
 
 
 void main()
@@ -34,7 +35,8 @@ void main()
 
     // Calculate the lighting normal for the sphere
     vec3 normal = vec3(impostorCoord, normalizedDepth);
-    vec3 finalSphereColor = sphereColor;
+    // vec3 finalSphereColor = sphereColor;
+    vec3 finalSphereColor = color;
 
     // ambient
     float lightingIntensity = 0.3 + 0.7 * clamp(dot(lightPosition, normal), 0.0, 1.0);
