@@ -6,6 +6,8 @@ import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.widget.CursorAdapter;
+import android.widget.SearchView;
 
 /**
  * Activity will show a list of downloaded PDB files and
@@ -27,6 +29,24 @@ public class ActivityOpeningView extends Activity {
     public boolean onCreateOptionsMenu(Menu menu) {
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.main_menu, menu);
+
+        // Setup the SearchView to handle to submission..
+        SearchView search = (SearchView) menu.findItem(R.id.action_search).getActionView();
+        search.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                // do the search
+                // TODO : should create an AsyncTask to submit a POST request to the PDB website.
+                // process the query response and get
+
+                return false;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                return false;
+            }
+        });
 
         return true;
     }

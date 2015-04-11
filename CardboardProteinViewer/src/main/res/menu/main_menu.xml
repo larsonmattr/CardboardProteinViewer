@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:id="@+id/PDB"
+    <item android:id="@+id/action_search"
         android:title="@string/pdb"
         android:icon="@drawable/ic_search"
         android:showAsAction="collapseActionView|ifRoom"
