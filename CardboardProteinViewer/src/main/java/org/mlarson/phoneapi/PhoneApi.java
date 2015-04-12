@@ -121,9 +121,12 @@ public class PhoneApi {
         // will always be working with an open connection.
         try {
             // send the parameters in the request body.
+            byte[] parameterData = aparms.getBytes("UTF-8");
+
             myconn.setRequestMethod("POST");
             myconn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=utf-8");
             myconn.setRequestProperty("Accept", "*/*");
+            myconn.setRequestProperty("Content-Length", Integer.toString( parameterData.length ));
 
             myconn.setDoOutput(true); // we will send parameters.
             myconn.setDoInput(true);
@@ -131,7 +134,6 @@ public class PhoneApi {
             // myconn.setReadTimeout(80000);
             myconn.connect();
 
-            byte[] parameterData = aparms.getBytes("UTF-8");
             OutputStream out = myconn.getOutputStream();
 
             out.write(parameterData);

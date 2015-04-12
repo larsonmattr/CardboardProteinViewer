@@ -14,13 +14,13 @@ import java.io.Serializable;
  *
  */
 public class SerializableAppState implements Serializable {
-    private Structure pdb = null;
+    private String pdbId = null;
 
-    public Structure getPdb() {
-        return pdb;
+    public String getPdb() {
+        return pdbId;
     }
 
-    public void setPdb(Structure pdb) {
-        this.pdb = pdb;
+    public void setPdb(String pdb) {
+        this.pdbId = pdb;
     }
 }

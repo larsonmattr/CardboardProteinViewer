@@ -2,6 +2,9 @@
 <resources>
     <string name="app_name">Protein StereoViewer</string>
 
+    <!-- Main activity -->
+    <string name="pdb_query_message">Querying the PDB..</string>
+
     <!-- menu items -->
     <string name="about">About</string>
     <string name="help">Help</string>

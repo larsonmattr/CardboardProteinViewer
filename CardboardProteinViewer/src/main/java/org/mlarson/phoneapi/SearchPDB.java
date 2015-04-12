@@ -38,8 +38,6 @@ public class SearchPDB {
     }
 
     private String buildParameters() {
-        StringBuilder params = new StringBuilder();
-
         /* Example for a text search:
 
             <orgPdbQuery>
@@ -60,6 +58,6 @@ public class SearchPDB {
                     "<keywords>" + queryText + "</keywords>" +
                 "</orgPdbQuery>";
 
-        return params.toString();
+        return xml;
     }
 }
